@@ -24,6 +24,7 @@ from sweagent.agent.parsing import FormatError, ParseFunction
 from sweagent.environment.swe_env import SWEEnv
 from sweagent.utils.config import convert_paths_to_abspath
 from sweagent.utils.log import get_logger
+from mcts import Node, TreeState
 
 
 @dataclass(frozen=True)
@@ -235,6 +236,13 @@ class AgentHook:
         action: str = "",
     ): ...
 
+def run_git_commit_creation_subprocess():
+        '''TODO: implement. Create the git commit and return the commit hash'''
+        return 
+
+def git_commit_restore_subprocess(git_commit_hash):
+    '''TODO: implement. Restore the git commit'''
+    return 
 
 class Agent:
     """Agent handles the behaviour of the model and how it interacts with the environment."""
@@ -756,6 +764,8 @@ class Agent:
         self.model.stats.replace(sub_agent.model.stats)
         return sub_agent_output
 
+    
+    
     def run(
         self,
         setup_args: dict[str, Any],
@@ -784,6 +794,7 @@ class Agent:
             the info dictionary and the trajectory (list of dictionaries).
         """
         done = False
+        NUM_CHILDREN = 3
         # mypy checks
         assert env.container_obj is not None
         assert env.record is not None
@@ -806,14 +817,18 @@ class Agent:
         self.logger.info("Trajectory will be saved to %s", traj_log_path)
         # INIT the tree
         # create the root and save the git commit
+        git_hash = run_git_commit_creation_subprocess()
+        root = Node([], None, None, git_hash)
+        mcts_tree = {"root": root, "input": "TODO: implement"}
+        
         
         while not done:
             for hook in self.hooks:
                 hook.on_step_start()
             
-            # root = state['root']
+            root = mcts_tree['root']
             # pull from the root the commit and restore
-            
+            git_commit_restore_subprocess(root.git_commit_hash)
 
             ## candidate generation code
             # for _ in range(k):

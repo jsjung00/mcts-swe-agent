@@ -34,8 +34,9 @@ class Node:
     def __init__(
             self,
             messages: list[BaseMessage],
-            reflection: Reflection,
-            parent: Optional[Node] = None 
+            reflection: Optional[Reflection],
+            parent: Optional[Node] = None,
+            git_commit_hash: str 
     ):
         self.messages = messages 
         self.parent = parent 
@@ -43,12 +44,13 @@ class Node:
         self.value = 0
         self.visits = 0
         self.reflection = reflection 
+        self.git_commit_hash = git_commit_hash
         self.depth = parent.depth + 1 if parent is not None else 1 
         self._is_solved = reflection.found_solution if reflection else False 
         if self._is_solved:
             self._mark_tree_as_solved()
-        
-        self.backpropagate(reflection.normalized_score)
+        if self.reflection:
+            self.backpropagate(reflection.normalized_score)
     
     def __repr__(self) -> str:
         return (
