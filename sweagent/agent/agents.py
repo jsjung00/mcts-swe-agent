@@ -804,11 +804,26 @@ class Agent:
         info = {}
         traj_log_path = traj_dir / (env.record["instance_id"] + ".traj")
         self.logger.info("Trajectory will be saved to %s", traj_log_path)
+        # INIT the tree
+        # create the root and save the git commit
+        
         while not done:
             for hook in self.hooks:
                 hook.on_step_start()
+            
+            # root = state['root']
+            # pull from the root the commit and restore
+            
+
+            ## candidate generation code
+            # for _ in range(k):
+            # restore the parent commit 
+            ### EXECUTE THIS IN THE FOR LOOP
             state = env.communicate(self.state_command) if self.state_command else None
             thought, action, output = self.forward(observation, env.get_available_actions(), state)
+            
+            
+            
             for hook in self.hooks:
                 hook.on_actions_generated(thought=thought, action=action, output=output)
             observations = list()
@@ -848,6 +863,15 @@ class Agent:
                 self.save_trajectory(trajectory, traj_log_path, env_name=env.name, info=info)
             for hook in self.hooks:
                 hook.on_step_done(trajectory_step=trajectory_step, model_stats=model_stats)
+            
+            # save the git commit 
+            # exit the for loop
+
+            # candiate reflection code
+            # for each candiate: reflect 
+            # create a node and grow the tree 
+
+
 
         for hook in self.hooks:
             hook.on_run_done()
