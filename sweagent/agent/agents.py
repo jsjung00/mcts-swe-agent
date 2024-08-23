@@ -27,6 +27,9 @@ from sweagent.utils.log import get_logger
 from sweagent.agent.mcts import Node, TreeState
 
 
+REFLECTION_TEMPLATE = """"""
+
+
 @dataclass(frozen=True)
 class Subroutine(FrozenSerializable):
     name: str
@@ -794,7 +797,7 @@ class Agent:
             the info dictionary and the trajectory (list of dictionaries).
         """
         done = False
-        NUM_CHILDREN = 3
+        NUM_CHILDREN = 1
         # mypy checks
         assert env.container_obj is not None
         assert env.record is not None
@@ -822,89 +825,113 @@ class Agent:
         root = Node([], None, None, git_hash, trajectory, env_state, observation, self.history, self.get_environment_vars(env))
         mcts_tree = {"root": root, "input": "TODO: implement"}
         
+        score = 1
         
         while not done:
             #for hook in self.hooks:
             #    hook.on_step_start()
             
-            root = mcts_tree['root']
+            root = mcts_tree["root"]
+            best_candidate = root.best_child if root.children else root
 
-            trajectory = root.trajectory.copy()
-            state = root.env_state
-            observation = root.observation
-            self.history = root.history.copy()
-            self.set_environment_vars(env, root.env_vars)
+            trajectory = best_candidate.trajectory.copy()
+            state = best_candidate.env_state
+            observation = best_candidate.observation
+            self.history = best_candidate.history.copy()
+            self.set_environment_vars(env, best_candidate.env_vars)
 
             # pull from the root the commit and restore
-            git_commit_restore_subprocess(root.git_commit_hash)
+            git_commit_restore_subprocess(best_candidate.git_commit_hash)
 
             ## candidate generation code
-            # for _ in range(k):
-            # restore the parent commit 
-            ### EXECUTE THIS IN THE FOR LOOP
-            # state = env.communicate(self.state_command) if self.state_command else None
-            thought, action, output = self.forward(observation, env.get_available_actions(), state)
-            
-            
-            
-            for hook in self.hooks:
-                hook.on_actions_generated(thought=thought, action=action, output=output)
-            observations = list()
-            run_action = self._guard_multiline_input(action)
-            for sub_action in self.split_actions(run_action):
-                if sub_action["agent"] == self.name or sub_action["cmd_name"] == self.config.submit_command:
-                    for hook in self.hooks:
-                        hook.on_sub_action_started(sub_action=sub_action)
-                    obs, _, done, info = env.step(sub_action["action"])
-                    for hook in self.hooks:
-                        hook.on_sub_action_executed(obs=obs, done=done)
-                    observations.append(obs)
-                    if sub_action["cmd_name"] == self.config.submit_command:
-                        done = True
-                    if done:
-                        break
-                else:
-                    agent_name = sub_action["agent"]
-                    sub_agent_output = self.call_subroutine(agent_name, sub_action, env)
-                    observations.append(sub_agent_output)
+            for _ in range(NUM_CHILDREN):
+                # restore the parent commit 
+                ### EXECUTE THIS IN THE FOR LOOP
+                # state = env.communicate(self.state_command) if self.state_command else None
+                thought, action, output = self.forward(observation, env.get_available_actions(), state)
+                
+                
+                
+                for hook in self.hooks:
+                    hook.on_actions_generated(thought=thought, action=action, output=output)
+                observations = list()
+                run_action = self._guard_multiline_input(action)
+                for sub_action in self.split_actions(run_action):
+                    if sub_action["agent"] == self.name or sub_action["cmd_name"] == self.config.submit_command:
+                        for hook in self.hooks:
+                            hook.on_sub_action_started(sub_action=sub_action)
+                        obs, _, done, info = env.step(sub_action["action"])
+                        for hook in self.hooks:
+                            hook.on_sub_action_executed(obs=obs, done=done)
+                        observations.append(obs)
+                        if sub_action["cmd_name"] == self.config.submit_command:
+                            done = True
+                        if done:
+                            break
+                    else:
+                        agent_name = sub_action["agent"]
+                        sub_agent_output = self.call_subroutine(agent_name, sub_action, env)
+                        observations.append(sub_agent_output)
 
-            observation = "\n".join([obs for obs in observations if obs is not None])
+                observation = "\n".join([obs for obs in observations if obs is not None])
 
-            trajectory_step = TrajectoryStep(
-                {
-                    "action": action,
-                    "observation": observation,
-                    "response": output,
-                    "state": state,
-                    "thought": thought,
-                },
-            )
-            trajectory.append(trajectory_step)
-            model_stats: APIStats = self.model.stats
-            info["model_stats"] = model_stats.to_dict()
-            if traj_dir:
-                self.save_trajectory(trajectory, traj_log_path, env_name=env.name, info=info)
-            for hook in self.hooks:
-                hook.on_step_done(trajectory_step=trajectory_step, model_stats=model_stats)
-            
-            # save the git commit 
-            # exit the for loop
+                trajectory_step = TrajectoryStep(
+                    {
+                        "action": action,
+                        "observation": observation,
+                        "response": output,
+                        "state": state,
+                        "thought": thought,
+                    },
+                )
+                trajectory.append(trajectory_step)
+                model_stats: APIStats = self.model.stats
+                info["model_stats"] = model_stats.to_dict()
+                if traj_dir:
+                    self.save_trajectory(trajectory, traj_log_path, env_name=env.name, info=info)
+                for hook in self.hooks:
+                    hook.on_step_done(trajectory_step=trajectory_step, model_stats=model_stats)
+                
+                # candiate reflection code
+                # for each candiate: reflect 
 
-            # candiate reflection code
-            # for each candiate: reflect 
-            # create a node and grow the tree 
+                progress_str = f"The Task: {self.instance_args['issue']}\n"
+                first_message = True
+                for message in self.local_history:
+                    if message.get("is_demo"): continue
+                    if message['role'] == 'assistant':
+                        progress_str += f"Agent Thought: {message['thought']}\n"
+                        progress_str += f"Agent Action: {message['action']}\n"
+                    if message['role'] == 'user':
+                        if not first_message:
+                            progress_str += f"Action result: {message['content']}\n"
+                        first_message = False
 
-            node = Node(
-                messages=root.messages,# TODO append()
-                reflection=None, # TODO
-                parent=root,
-                git_commit_hash=None, # TODO
-                trajectory=trajectory,
-                env_state=env.communicate(self.state_command) if self.state_command else None,
-                observation=observation,
-                history=self.history,
-                env_vars=self.get_environment_vars(env)
-            )
+                print("!!!!OUR_HISTORY")
+                print(progress_str)
+                print("!!!!END HISTORY")
+
+
+                node = Node(
+                    messages=root.messages,# TODO append()
+                    reflection=None, # TODO
+                    parent=root,
+                    git_commit_hash=run_git_commit_creation_subprocess(),
+                    trajectory=trajectory,
+                    env_state=env.communicate(self.state_command) if self.state_command else None,
+                    observation=observation,
+                    history=self.history,
+                    env_vars=self.get_environment_vars(env)
+                )
+
+                node.backpropagate(score)
+
+                best_candidate.children.append(node)
+
+                score += 1
+
+                if done:
+                    break
 
 
 
