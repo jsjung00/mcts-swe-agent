@@ -896,7 +896,7 @@ class Agent:
             the info dictionary and the trajectory (list of dictionaries).
         """
         done = False
-        NUM_CHILDREN = 3
+        NUM_CHILDREN = 2
         # mypy checks
         assert env.container_obj is not None
         assert env.record is not None
@@ -1014,7 +1014,7 @@ class Agent:
 
                 eval_user_prompt = f"Task and agent progress: \n{progress_str}"    
                 json_score = call_gpt(evaluation_system_prompt, eval_user_prompt)
-                score = json_score["score"] / 10
+                score = json_score["score"]
                 print("SCORE:", score)
 
                 node = Node(
