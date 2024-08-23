@@ -42,6 +42,7 @@ class Node:
             observation: Optional[str],
             history: list[str],
             env_vars: dict[str, str],
+            name: str,
             #value: float = 0.0,
     ):
         self.messages = messages 
@@ -56,6 +57,7 @@ class Node:
         self.observation = observation
         self.history = history.copy()
         self.env_vars = env_vars
+        self.name = name
         self.depth = parent.depth + 1 if parent is not None else 1 
         self._is_solved = reflection.found_solution if reflection else False 
         if self._is_solved:

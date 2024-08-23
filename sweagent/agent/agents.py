@@ -886,7 +886,7 @@ class Agent:
         # create the root and save the git commit
         git_hash = run_git_commit_creation_subprocess_on_env(env)
         env_state = env.communicate(self.state_command) if self.state_command else None
-        root = Node([], None, None, git_hash, trajectory, env_state, observation, self.history, self.get_environment_vars(env))
+        root = Node([], None, None, git_hash, trajectory, env_state, observation, self.history, self.get_environment_vars(env), name="ROOT")
         mcts_tree = {"root": root, "input": "TODO: implement"}
         
         score = 1
@@ -897,6 +897,10 @@ class Agent:
             
             root = mcts_tree["root"]
             best_candidate = root.best_child if root.children else root
+
+            print("Best Candidate:")
+            print(best_candidate)
+            print(best_candidate.name)
 
             ## candidate generation code
             actions_tried_by_children = set()
@@ -1029,6 +1033,7 @@ Return a json as an example output
                     observation=observation,
                     history=self.history,
                     env_vars=self.get_environment_vars(env),
+                    name=best_candidate.name + " -> " + action.split("\n")[0],
                     #value=0,
                 )
 
