@@ -894,6 +894,7 @@ class Agent:
                 
                 if action in actions_tried_by_children:
                     print("Skipping already seen action:", action)
+                    continue
                 actions_tried_by_children |= {action}
                 
                 for hook in self.hooks:
