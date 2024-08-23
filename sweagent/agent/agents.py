@@ -817,7 +817,7 @@ class Agent:
             the info dictionary and the trajectory (list of dictionaries).
         """
         done = False
-        NUM_CHILDREN = 1
+        NUM_CHILDREN = 5
         # mypy checks
         assert env.container_obj is not None
         assert env.record is not None
@@ -864,13 +864,16 @@ class Agent:
             git_commit_restore_subprocess(best_candidate.git_commit_hash)
 
             ## candidate generation code
+            actions_tried_by_children = set()
             for _ in range(NUM_CHILDREN):
                 # restore the parent commit 
                 ### EXECUTE THIS IN THE FOR LOOP
                 # state = env.communicate(self.state_command) if self.state_command else None
                 thought, action, output = self.forward(observation, env.get_available_actions(), state)
                 
-                
+                if action in actions_tried_by_children:
+                    print("Skipping already seen action:", action)
+                actions_tried_by_children |= {action}
                 
                 for hook in self.hooks:
                     hook.on_actions_generated(thought=thought, action=action, output=output)
@@ -927,10 +930,18 @@ class Agent:
                             progress_str += f"Action result: {message['content']}\n"
                         first_message = False
 
-                print("!!!!OUR_HISTORY")
-                print(progress_str)
-                print("!!!!END HISTORY")
+                #print("!!!!OUR_HISTORY")
+                #print(progress_str)
+                #print("!!!!END HISTORY")
 
+                evaluation_system_prompt = """
+  SETTING: You are judging the progress of an autonomous programmer.
+  You will be given a task that is being solved, along with the reasoning (Agent Thought) and actions (Agent Action) taken by the agent.
+  You will also see the results of these actions (Action result).
+  Your job is to evaluate the progress of the agent and provide feedback.
+
+  RESPONSE FORMAT: Output your reasoning followed by a score from 1-10 on a single line.
+"""
 
                 node = Node(
                     messages=root.messages,# TODO append()
