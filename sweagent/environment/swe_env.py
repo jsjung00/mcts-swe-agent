@@ -433,7 +433,6 @@ class SWEEnv(gym.Env):
             return observation, 0, True, info
         if action in {"exit_context", "exit_cost", "exit_error", "exit_format", "exit_api"}:
             try:
-                env.communicate_with_handling(f"git reset --soft {env.base_commit}", f"Failed to restore to commit {env.base_commit}")
                 observation = self.communicate(input="submit")
                 submission = self.get_submission(observation)
                 assert submission is not None and submission.strip() != "", AssertionError("No submission found.")
@@ -445,7 +444,8 @@ class SWEEnv(gym.Env):
                 return observation, 0, True, info
             except KeyboardInterrupt:
                 raise
-            except:
+            except Exception as e:
+                print(e)
                 observation = "Exited"
                 info["exit_status"] = action
                 return observation, 0, True, info

@@ -896,7 +896,7 @@ class Agent:
             the info dictionary and the trajectory (list of dictionaries).
         """
         done = False
-        NUM_CHILDREN = 1#5
+        NUM_CHILDREN = 3
         # mypy checks
         assert env.container_obj is not None
         assert env.record is not None
@@ -949,12 +949,8 @@ class Agent:
                 git_commit_restore_subprocess_on_env(env, best_candidate.git_commit_hash)
                 
                 env.communicate_with_handling(f"git reset --soft {git_hash}", f"Failed to restore to commit {git_hash}")
-                # state = env.communicate(self.state_command) if self.state_command else None
-                thought, action, output = self.forward(observation, env.get_available_actions(), state)
 
-                print("GIT DIFF")
-                print(env.communicate_with_handling("git diff --cached", "Failed to run git diff"))
-                print("END GIT DIFF")
+                thought, action, output = self.forward(observation, env.get_available_actions(), state)
                 
                 if action in actions_tried_by_children:
                     print("Skipping already seen action:", action)
@@ -966,12 +962,6 @@ class Agent:
                 observations = list()
                 run_action = self._guard_multiline_input(action)
                 for sub_action in self.split_actions(run_action):
-                    if sub_action["cmd_name"] in [self.config.submit_command, "exit_context", "exit_cost", "exit_error", "exit_format", "exit_api"]:
-                        breakpoint()
-                        #if env.base_commit is None:
-                        #env.communicate_with_handling(f"git reset --soft {git_hash}", f"Failed to restore to commit {git_hash}")
-                        #else:   
-                        #    env.communicate_with_handling(f"git reset --soft {env.base_commit}", f"Failed to restore to commit {env.base_commit}")
                     if sub_action["agent"] == self.name or sub_action["cmd_name"] == self.config.submit_command:
                         # git reset ORIGINAL_HEAD
                         for hook in self.hooks:
