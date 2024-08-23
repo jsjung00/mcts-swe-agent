@@ -242,10 +242,12 @@ class AgentHook:
 def run_git_commit_creation_subprocess():
         '''Create the git commit and return the commit hash'''
         try:
-            subprocess.run(["git", "add", "."], check=True)
-            subprocess.run(["git", "commit", "-m", "Progress"], check=True)
-            result = subprocess.run(["git", "log", "--format=%H", "-n", "1"], 
-                                    capture_output=True, text=True, check=True)
+            status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, check=True)
+            if status.stdout.strip():
+                subprocess.run(["git", "add", "."], check=True)
+                subprocess.run(["git", "commit", "-m", "Progress"], check=True)
+
+            result = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True)
             # Return the commit hashg
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
@@ -854,18 +856,18 @@ class Agent:
             root = mcts_tree["root"]
             best_candidate = root.best_child if root.children else root
 
-            trajectory = best_candidate.trajectory.copy()
-            state = best_candidate.env_state
-            observation = best_candidate.observation
-            self.history = best_candidate.history.copy()
-            self.set_environment_vars(env, best_candidate.env_vars)
-
-            # pull from the root the commit and restore
-            git_commit_restore_subprocess(best_candidate.git_commit_hash)
-
             ## candidate generation code
             actions_tried_by_children = set()
             for _ in range(NUM_CHILDREN):
+
+                trajectory = best_candidate.trajectory.copy()
+                state = best_candidate.env_state
+                observation = best_candidate.observation
+                self.history = best_candidate.history.copy()
+                self.set_environment_vars(env, best_candidate.env_vars)
+
+                # pull from the root the commit and restore
+                git_commit_restore_subprocess(best_candidate.git_commit_hash)
                 # restore the parent commit 
                 ### EXECUTE THIS IN THE FOR LOOP
                 # state = env.communicate(self.state_command) if self.state_command else None
