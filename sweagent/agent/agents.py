@@ -285,6 +285,7 @@ def run_git_commit_creation_subprocess_on_env(env: SWEEnv):
     if status.strip():
         env.communicate_with_handling("git add .", "Failed to add files to git")
         env.communicate_with_handling("git commit -m 'Progress'", "Failed to commit changes")
+        #env.communicate_with_handling(f"git reset --soft {env.base_commit}", f"Failed to restore to commit {env.base_commit}")
 
     result = env.communicate_with_handling("git rev-parse HEAD", "Failed to get commit hash")
     return result.strip()
@@ -296,6 +297,7 @@ def git_commit_restore_subprocess_on_env(env, git_commit_hash):
         print("Warning: You have uncomitted changes.")
     
     env.communicate_with_handling(f"git reset --hard {git_commit_hash}", f"Failed to restore to commit {git_commit_hash}")
+    #env.communicate_with_handling(f"git reset --soft {env.base_commit}", f"Failed to restore to commit {env.base_commit}")
 
     print(f"Restored to commit {git_commit_hash}")
 
@@ -894,7 +896,7 @@ class Agent:
             the info dictionary and the trajectory (list of dictionaries).
         """
         done = False
-        NUM_CHILDREN = 5
+        NUM_CHILDREN = 1#5
         # mypy checks
         assert env.container_obj is not None
         assert env.record is not None
@@ -945,8 +947,14 @@ class Agent:
 
                 # restore the parent commit 
                 git_commit_restore_subprocess_on_env(env, best_candidate.git_commit_hash)
+                
+                env.communicate_with_handling(f"git reset --soft {git_hash}", f"Failed to restore to commit {git_hash}")
                 # state = env.communicate(self.state_command) if self.state_command else None
                 thought, action, output = self.forward(observation, env.get_available_actions(), state)
+
+                print("GIT DIFF")
+                print(env.communicate_with_handling("git diff --cached", "Failed to run git diff"))
+                print("END GIT DIFF")
                 
                 if action in actions_tried_by_children:
                     print("Skipping already seen action:", action)
@@ -958,7 +966,14 @@ class Agent:
                 observations = list()
                 run_action = self._guard_multiline_input(action)
                 for sub_action in self.split_actions(run_action):
+                    if sub_action["cmd_name"] in [self.config.submit_command, "exit_context", "exit_cost", "exit_error", "exit_format", "exit_api"]:
+                        breakpoint()
+                        #if env.base_commit is None:
+                        #env.communicate_with_handling(f"git reset --soft {git_hash}", f"Failed to restore to commit {git_hash}")
+                        #else:   
+                        #    env.communicate_with_handling(f"git reset --soft {env.base_commit}", f"Failed to restore to commit {env.base_commit}")
                     if sub_action["agent"] == self.name or sub_action["cmd_name"] == self.config.submit_command:
+                        # git reset ORIGINAL_HEAD
                         for hook in self.hooks:
                             hook.on_sub_action_started(sub_action=sub_action)
                         obs, _, done, info = env.step(sub_action["action"])
@@ -1009,7 +1024,7 @@ class Agent:
 
                 eval_user_prompt = f"Task and agent progress: \n{progress_str}"    
                 json_score = call_gpt(evaluation_system_prompt, eval_user_prompt)
-                score = json_score["score"]
+                score = json_score["score"] / 10
                 print("SCORE:", score)
 
                 node = Node(
