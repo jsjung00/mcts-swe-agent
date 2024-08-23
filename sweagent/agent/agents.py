@@ -894,7 +894,7 @@ class Agent:
             the info dictionary and the trajectory (list of dictionaries).
         """
         done = False
-        NUM_CHILDREN = 2
+        NUM_CHILDREN = 5
         # mypy checks
         assert env.container_obj is not None
         assert env.record is not None
