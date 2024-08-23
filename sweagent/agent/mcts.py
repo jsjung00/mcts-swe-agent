@@ -35,8 +35,13 @@ class Node:
             self,
             messages: list[BaseMessage],
             reflection: Optional[Reflection],
-            parent: Optional[Node] = None,
-            git_commit_hash: str 
+            parent: Optional['Node'],
+            git_commit_hash: str,
+            trajectory: list[str],
+            env_state: Optional[str],
+            observation: Optional[str],
+            history: list[str],
+            env_vars: dict[str, str],
     ):
         self.messages = messages 
         self.parent = parent 
@@ -45,6 +50,11 @@ class Node:
         self.visits = 0
         self.reflection = reflection 
         self.git_commit_hash = git_commit_hash
+        self.trajectory = trajectory.copy()
+        self.env_state = env_state
+        self.observation = observation
+        self.history = history.copy()
+        self.env_vars = env_vars
         self.depth = parent.depth + 1 if parent is not None else 1 
         self._is_solved = reflection.found_solution if reflection else False 
         if self._is_solved:

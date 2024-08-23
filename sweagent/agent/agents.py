@@ -24,7 +24,7 @@ from sweagent.agent.parsing import FormatError, ParseFunction
 from sweagent.environment.swe_env import SWEEnv
 from sweagent.utils.config import convert_paths_to_abspath
 from sweagent.utils.log import get_logger
-from mcts import Node, TreeState
+from sweagent.agent.mcts import Node, TreeState
 
 
 @dataclass(frozen=True)
@@ -818,15 +818,23 @@ class Agent:
         # INIT the tree
         # create the root and save the git commit
         git_hash = run_git_commit_creation_subprocess()
-        root = Node([], None, None, git_hash)
+        env_state = env.communicate(self.state_command) if self.state_command else None
+        root = Node([], None, None, git_hash, trajectory, env_state, observation, self.history, self.get_environment_vars(env))
         mcts_tree = {"root": root, "input": "TODO: implement"}
         
         
         while not done:
-            for hook in self.hooks:
-                hook.on_step_start()
+            #for hook in self.hooks:
+            #    hook.on_step_start()
             
             root = mcts_tree['root']
+
+            trajectory = root.trajectory.copy()
+            state = root.env_state
+            observation = root.observation
+            self.history = root.history.copy()
+            self.set_environment_vars(env, root.env_vars)
+
             # pull from the root the commit and restore
             git_commit_restore_subprocess(root.git_commit_hash)
 
@@ -834,7 +842,7 @@ class Agent:
             # for _ in range(k):
             # restore the parent commit 
             ### EXECUTE THIS IN THE FOR LOOP
-            state = env.communicate(self.state_command) if self.state_command else None
+            # state = env.communicate(self.state_command) if self.state_command else None
             thought, action, output = self.forward(observation, env.get_available_actions(), state)
             
             
@@ -885,6 +893,18 @@ class Agent:
             # candiate reflection code
             # for each candiate: reflect 
             # create a node and grow the tree 
+
+            node = Node(
+                messages=root.messages,# TODO append()
+                reflection=None, # TODO
+                parent=root,
+                git_commit_hash=None, # TODO
+                trajectory=trajectory,
+                env_state=env.communicate(self.state_command) if self.state_command else None,
+                observation=observation,
+                history=self.history,
+                env_vars=self.get_environment_vars(env)
+            )
 
 
 
