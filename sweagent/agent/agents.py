@@ -1011,6 +1011,7 @@ class Agent:
                         if not first_message:
                             progress_str += f"Action result: {message['content']}\n"
                         first_message = False
+                progress_str += f"Action result: {observation}\n"
 
                 eval_user_prompt = f"Task and agent progress: \n{progress_str}"    
                 json_score = call_gpt(evaluation_system_prompt, eval_user_prompt)
