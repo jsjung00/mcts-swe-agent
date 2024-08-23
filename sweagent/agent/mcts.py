@@ -153,3 +153,35 @@ class TreeState(TypedDict):
     # this is the full MCTS tree 
     root: Node 
     input: str 
+import math 
+
+class MCTSNode:
+    def __init__(self, state, parent=None):
+        self.state = state 
+        self.parent = parent 
+        self.children = []
+        self.visits = 0
+        self.value = 0
+    
+    def uct_value(self, exploration_weight=1.0):
+        if self.visits == 0:
+            return float('int')
+
+        return (self.value / self.visits) + exploration_weight*math.sqrt(math.log(self.parent.visits)/self.visits)
+
+    def best_child(self):
+        if not self.children:
+            return None 
+        return max(self.children, key=lambda child: child.uct())
+
+    def best_child_value(self):
+        if not self.children:
+            return None 
+        return max(self.children, key=lambda child: child.value)
+    
+    def update(self, reward:float):
+        self.visits += 1
+        self.value += reward 
+
+    
+

@@ -918,3 +918,6 @@ class Agent:
         if return_type == "info_trajectory":
             return info, trajectory
         return trajectory[-1][return_type]
+
+    def mcts_search(self, root_state, num_simulations=100):
+        pass 
