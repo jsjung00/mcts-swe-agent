@@ -26,6 +26,11 @@ from sweagent.utils.config import convert_paths_to_abspath
 from sweagent.utils.log import get_logger
 from sweagent.agent.mcts import Node, TreeState
 import subprocess
+from openai import OpenAI   
+from dotenv import load_dotenv
+load_dotenv()
+import os 
+import json 
 
 REFLECTION_TEMPLATE = """"""
 
@@ -267,6 +272,20 @@ def git_commit_restore_subprocess(git_commit_hash):
     except subprocess.CalledProcessError as e:
         print(f"An error occured: {e}")
         return False 
+
+def call_gpt(system_prompt, user_prompt, model='gpt-4o-mini', json_mode=True):
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}] 
+    
+    if json_mode:
+        response = client.chat.completions.create(model=model, messages=messages, response_format={"type":"json_object"})
+        content = response.choices[0].message.content
+        content = json.loads(content)
+    else:
+        response = client.chat.completions.create(model=model, messages=messages)
+        content = response.choices[0].message.content
+    
+    return content
 
 
 class Agent:
@@ -937,13 +956,44 @@ class Agent:
                 #print("!!!!END HISTORY")
 
                 evaluation_system_prompt = """
-  SETTING: You are judging the progress of an autonomous programmer.
+  You are an judging the progress of an autonomous programmer.
   You will be given a task that is being solved, along with the reasoning (Agent Thought) and actions (Agent Action) taken by the agent.
   You will also see the results of these actions (Action result).
   Your job is to evaluate the progress of the agent and provide feedback.
 
   RESPONSE FORMAT: Output your reasoning followed by a score from 1-10 on a single line.
 """
+                evaluation_system_prompt = """You are an expert software engineering evaluator. Your task is to assess the progress of a software engineering agent (swe-agent) working on a coding task. You will be provided with the following information:
+
+The original coding task description
+The current state of the code or solution
+Any intermediate steps or reasoning provided by the swe-agent
+
+Based on this information, you must evaluate the progress and assign a score from 1 to 10, where:
+1 = No progress or completely off-track
+5 = Moderate progress, on the right track but significant work remains
+10 = Task completed successfully and efficiently
+
+Consider the following factors in your evaluation:
+
+Correctness: How accurate is the current solution compared to the requirements?
+Completeness: How much of the task has been addressed?
+Efficiency: Is the approach optimal or are there unnecessary complexities?
+Code quality: Is the code well-structured, readable, and following best practices?
+Problem-solving approach: Has the swe-agent demonstrated a logical and effective approach to solving the problem?
+
+Please return your response as a JSON which contains the numerical rating.
+
+For example, given input:
+ f"Task and agent progress: {{INPUT}}" 
+
+Return a json as an example output
+{"score": 5}"""
+
+                eval_user_prompt = f"Task and agent progress: \n{progress_str}"    
+                json_score = call_gpt(evaluation_system_prompt, eval_user_prompt)
+                score = json_score["score"]
+                print("SCORE:", score)
 
                 node = Node(
                     messages=root.messages,# TODO append()
@@ -954,14 +1004,15 @@ class Agent:
                     env_state=env.communicate(self.state_command) if self.state_command else None,
                     observation=observation,
                     history=self.history,
-                    env_vars=self.get_environment_vars(env)
+                    env_vars=self.get_environment_vars(env),
+                    #value=0,
                 )
 
                 node.backpropagate(score)
 
                 best_candidate.children.append(node)
 
-                score += 1
+                #score += 1
 
                 if done:
                     break

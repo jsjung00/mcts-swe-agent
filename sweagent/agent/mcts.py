@@ -42,11 +42,12 @@ class Node:
             observation: Optional[str],
             history: list[str],
             env_vars: dict[str, str],
+            #value: float = 0.0,
     ):
         self.messages = messages 
         self.parent = parent 
         self.children = []
-        self.value = 0 # TODO
+        self.value = 0 # TODO value
         self.visits = 0
         self.reflection = reflection 
         self.git_commit_hash = git_commit_hash
