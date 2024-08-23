@@ -25,7 +25,7 @@ from sweagent.environment.swe_env import SWEEnv
 from sweagent.utils.config import convert_paths_to_abspath
 from sweagent.utils.log import get_logger
 from sweagent.agent.mcts import Node, TreeState
-
+import subprocess
 
 REFLECTION_TEMPLATE = """"""
 
@@ -240,12 +240,32 @@ class AgentHook:
     ): ...
 
 def run_git_commit_creation_subprocess():
-        '''TODO: implement. Create the git commit and return the commit hash'''
-        return 
+        '''Create the git commit and return the commit hash'''
+        try:
+            subprocess.run(["git", "add", "."], check=True)
+            subprocess.run(["git", "commit", "-m", commit_message], check=True)
+            result = subprocess.run(["git", "log", "--format=%H", "-n", "1"], 
+                                    capture_output=True, text=True, check=True)
+            # Return the commit hash
+            return result.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            print(f"An error occurred: {e}")
+            return None
 
 def git_commit_restore_subprocess(git_commit_hash):
-    '''TODO: implement. Restore the git commit'''
-    return 
+    '''Restore the git commit'''
+    try:
+        result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, check=True)
+        if result.stdout.strip():
+            print("Warning: You have uncomitted changes.")
+        
+        subprocess.run(["git", "reset", "--hard", git_commit_hash])
+
+        print(f"Restored to commit {git_commit_hash}")
+    except subprocess.CalledProcessError as e:
+        print(f"An error occured: {e}")
+        return False 
+
 
 class Agent:
     """Agent handles the behaviour of the model and how it interacts with the environment."""
