@@ -244,6 +244,29 @@ class AgentHook:
         action: str = "",
     ): ...
 
+
+
+def run_git_commit_creation_subprocess_on_env(env: SWEEnv):
+    '''Create the git commit and return the commit hash'''
+    status = env.communicate_with_handling("git status --porcelain", "Failed to run git status")
+    if status.strip():
+        env.communicate_with_handling("git add .", "Failed to add files to git")
+        env.communicate_with_handling("git commit -m 'Progress'", "Failed to commit changes")
+
+    result = env.communicate_with_handling("git rev-parse HEAD", "Failed to get commit hash")
+    return result.strip()
+
+def git_commit_restore_subprocess_on_env(env, git_commit_hash):
+    '''Restore the git commit'''
+    result = env.communicate_with_handling("git status --porcelain", "Failed to run git status")
+    if result.strip():
+        print("Warning: You have uncomitted changes.")
+    
+    env.communicate_with_handling(f"git reset --hard {git_commit_hash}", f"Failed to restore to commit {git_commit_hash}")
+
+    print(f"Restored to commit {git_commit_hash}")
+
+
 def run_git_commit_creation_subprocess():
         '''Create the git commit and return the commit hash'''
         try:
@@ -861,7 +884,7 @@ class Agent:
         self.logger.info("Trajectory will be saved to %s", traj_log_path)
         # INIT the tree
         # create the root and save the git commit
-        git_hash = run_git_commit_creation_subprocess()
+        git_hash = run_git_commit_creation_subprocess_on_env(env)
         env_state = env.communicate(self.state_command) if self.state_command else None
         root = Node([], None, None, git_hash, trajectory, env_state, observation, self.history, self.get_environment_vars(env))
         mcts_tree = {"root": root, "input": "TODO: implement"}
@@ -886,7 +909,7 @@ class Agent:
                 self.set_environment_vars(env, best_candidate.env_vars)
 
                 # pull from the root the commit and restore
-                git_commit_restore_subprocess(best_candidate.git_commit_hash)
+                git_commit_restore_subprocess_on_env(env, best_candidate.git_commit_hash)
                 # restore the parent commit 
                 ### EXECUTE THIS IN THE FOR LOOP
                 # state = env.communicate(self.state_command) if self.state_command else None
@@ -1000,7 +1023,7 @@ Return a json as an example output
                     messages=root.messages,# TODO append()
                     reflection=None, # TODO
                     parent=best_candidate,
-                    git_commit_hash=run_git_commit_creation_subprocess(),
+                    git_commit_hash=run_git_commit_creation_subprocess_on_env(env),
                     trajectory=trajectory,
                     env_state=env.communicate(self.state_command) if self.state_command else None,
                     observation=observation,
