@@ -243,10 +243,10 @@ def run_git_commit_creation_subprocess():
         '''Create the git commit and return the commit hash'''
         try:
             subprocess.run(["git", "add", "."], check=True)
-            subprocess.run(["git", "commit", "-m", commit_message], check=True)
+            subprocess.run(["git", "commit", "-m", "Progress"], check=True)
             result = subprocess.run(["git", "log", "--format=%H", "-n", "1"], 
                                     capture_output=True, text=True, check=True)
-            # Return the commit hash
+            # Return the commit hashg
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
             print(f"An error occurred: {e}")

@@ -46,7 +46,7 @@ class Node:
         self.messages = messages 
         self.parent = parent 
         self.children = []
-        self.value = 0
+        self.value = 0 # TODO
         self.visits = 0
         self.reflection = reflection 
         self.git_commit_hash = git_commit_hash
