@@ -838,7 +838,7 @@ class Agent:
             the info dictionary and the trajectory (list of dictionaries).
         """
         done = False
-        NUM_CHILDREN = 5
+        NUM_CHILDREN = 2
         # mypy checks
         assert env.container_obj is not None
         assert env.record is not None
@@ -998,7 +998,7 @@ Return a json as an example output
                 node = Node(
                     messages=root.messages,# TODO append()
                     reflection=None, # TODO
-                    parent=root,
+                    parent=best_candidate,
                     git_commit_hash=run_git_commit_creation_subprocess(),
                     trajectory=trajectory,
                     env_state=env.communicate(self.state_command) if self.state_command else None,
