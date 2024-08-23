@@ -24,7 +24,7 @@ from sweagent.agent.parsing import FormatError, ParseFunction
 from sweagent.environment.swe_env import SWEEnv
 from sweagent.utils.config import convert_paths_to_abspath
 from sweagent.utils.log import get_logger
-from sweagent.agent.mcts import Node, TreeState
+from sweagent.agent.mcts import Node
 import subprocess
 from openai import OpenAI   
 from dotenv import load_dotenv
@@ -32,7 +32,40 @@ load_dotenv()
 import os 
 import json 
 
-REFLECTION_TEMPLATE = """"""
+evaluation_system_prompt = """
+  You are an judging the progress of an autonomous programmer.
+  You will be given a task that is being solved, along with the reasoning (Agent Thought) and actions (Agent Action) taken by the agent.
+  You will also see the results of these actions (Action result).
+  Your job is to evaluate the progress of the agent and provide feedback.
+
+  RESPONSE FORMAT: Output your reasoning followed by a score from 1-10 on a single line.
+"""
+evaluation_system_prompt = """You are an expert software engineering evaluator. Your task is to assess the progress of a software engineering agent (swe-agent) working on a coding task. You will be provided with the following information:
+
+The original coding task description
+The current state of the code or solution
+Any intermediate steps or reasoning provided by the swe-agent
+
+Based on this information, you must evaluate the progress and assign a score from 1 to 10, where:
+1 = No progress or completely off-track
+5 = Moderate progress, on the right track but significant work remains
+10 = Task completed successfully and efficiently
+
+Consider the following factors in your evaluation:
+
+Correctness: How accurate is the current solution compared to the requirements?
+Completeness: How much of the task has been addressed?
+Efficiency: Is the approach optimal or are there unnecessary complexities?
+Code quality: Is the code well-structured, readable, and following best practices?
+Problem-solving approach: Has the swe-agent demonstrated a logical and effective approach to solving the problem?
+
+Please return your response as a JSON which contains the numerical rating.
+
+For example, given input:
+ f"Task and agent progress: {{INPUT}}" 
+
+Return a json as an example output
+{"score": 5}"""
 
 
 @dataclass(frozen=True)
@@ -887,9 +920,7 @@ class Agent:
         git_hash = run_git_commit_creation_subprocess_on_env(env)
         env_state = env.communicate(self.state_command) if self.state_command else None
         root = Node([], None, None, git_hash, trajectory, env_state, observation, self.history, self.get_environment_vars(env), name="ROOT")
-        mcts_tree = {"root": root, "input": "TODO: implement"}
-        
-        score = 1
+        mcts_tree = {"root": root}
         
         while not done:
             #for hook in self.hooks:
@@ -912,10 +943,8 @@ class Agent:
                 self.history = best_candidate.history.copy()
                 self.set_environment_vars(env, best_candidate.env_vars)
 
-                # pull from the root the commit and restore
-                git_commit_restore_subprocess_on_env(env, best_candidate.git_commit_hash)
                 # restore the parent commit 
-                ### EXECUTE THIS IN THE FOR LOOP
+                git_commit_restore_subprocess_on_env(env, best_candidate.git_commit_hash)
                 # state = env.communicate(self.state_command) if self.state_command else None
                 thought, action, output = self.forward(observation, env.get_available_actions(), state)
                 
@@ -964,8 +993,7 @@ class Agent:
                 for hook in self.hooks:
                     hook.on_step_done(trajectory_step=trajectory_step, model_stats=model_stats)
                 
-                # candiate reflection code
-                # for each candiate: reflect 
+                # each candidates is scored by an LLM judge
 
                 progress_str = f"The Task: {self.instance_args['issue']}\n"
                 first_message = True
@@ -978,45 +1006,6 @@ class Agent:
                         if not first_message:
                             progress_str += f"Action result: {message['content']}\n"
                         first_message = False
-
-                #print("!!!!OUR_HISTORY")
-                #print(progress_str)
-                #print("!!!!END HISTORY")
-
-                evaluation_system_prompt = """
-  You are an judging the progress of an autonomous programmer.
-  You will be given a task that is being solved, along with the reasoning (Agent Thought) and actions (Agent Action) taken by the agent.
-  You will also see the results of these actions (Action result).
-  Your job is to evaluate the progress of the agent and provide feedback.
-
-  RESPONSE FORMAT: Output your reasoning followed by a score from 1-10 on a single line.
-"""
-                evaluation_system_prompt = """You are an expert software engineering evaluator. Your task is to assess the progress of a software engineering agent (swe-agent) working on a coding task. You will be provided with the following information:
-
-The original coding task description
-The current state of the code or solution
-Any intermediate steps or reasoning provided by the swe-agent
-
-Based on this information, you must evaluate the progress and assign a score from 1 to 10, where:
-1 = No progress or completely off-track
-5 = Moderate progress, on the right track but significant work remains
-10 = Task completed successfully and efficiently
-
-Consider the following factors in your evaluation:
-
-Correctness: How accurate is the current solution compared to the requirements?
-Completeness: How much of the task has been addressed?
-Efficiency: Is the approach optimal or are there unnecessary complexities?
-Code quality: Is the code well-structured, readable, and following best practices?
-Problem-solving approach: Has the swe-agent demonstrated a logical and effective approach to solving the problem?
-
-Please return your response as a JSON which contains the numerical rating.
-
-For example, given input:
- f"Task and agent progress: {{INPUT}}" 
-
-Return a json as an example output
-{"score": 5}"""
 
                 eval_user_prompt = f"Task and agent progress: \n{progress_str}"    
                 json_score = call_gpt(evaluation_system_prompt, eval_user_prompt)
@@ -1034,14 +1023,11 @@ Return a json as an example output
                     history=self.history,
                     env_vars=self.get_environment_vars(env),
                     name=best_candidate.name + " -> " + action.split("\n")[0],
-                    #value=0,
                 )
 
                 node.backpropagate(score)
 
                 best_candidate.children.append(node)
-
-                #score += 1
 
                 if done:
                     break
@@ -1059,5 +1045,3 @@ Return a json as an example output
             return info, trajectory
         return trajectory[-1][return_type]
 
-    def mcts_search(self, root_state, num_simulations=100):
-        pass 
